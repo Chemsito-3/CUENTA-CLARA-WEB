@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<!--
+  dashboard.html - Panel principal del tendero
+  Proyecto: Cuenta Clara | Evidencia: GA7-220501096-AA5-EV03
+  Autor: Carlos Varón
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuenta Clara – Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-brand">💰 Cuenta <span>Clara</span></div>
+  <div class="navbar-links">
+    <a href="dashboard.html" class="nav-link active">🏠 Inicio</a>
+    <a href="clientes.html"  class="nav-link">👥 Clientes</a>
+    <a href="deudas.html"    class="nav-link">📋 Deudas</a>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="nav-user" id="nav-tienda"></span>
+    <button class="btn btn-sm" onclick="cerrarSesion()"
+      style="background:rgba(255,255,255,0.15);color:#fff">Salir</button>
+  </div>
+</nav>
+
+<div class="contenedor">
+  <h2 class="page-title">Panel de tu tienda</h2>
+  <div id="alerta" class="alerta-ui"></div>
+
+  <!-- Métricas -->
+  <div class="grid-metricas" id="metricas">
+    <div class="metrica"><div class="metrica-valor" id="m-clientes">–</div><div class="metrica-label">Clientes activos</div></div>
+    <div class="metrica"><div class="metrica-valor" id="m-pendiente">–</div><div class="metrica-label">Por cobrar</div></div>
+    <div class="metrica alerta"><div class="metrica-valor" id="m-proximas">–</div><div class="metrica-label">Vencen esta semana</div></div>
+    <div class="metrica peligro"><div class="metrica-valor" id="m-vencido">–</div><div class="metrica-label">Vencido</div></div>
+    <div class="metrica cobrado"><div class="metrica-valor" id="m-cobrado">–</div><div class="metrica-label">Ya cobrado</div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+    <!-- Alertas de vencimiento -->
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">⚠️ Alertas de vencimiento</div>
+      <div id="lista-alertas">
+        <div class="vacio"><div class="vacio-icono">✅</div><p>Sin alertas por ahora</p></div>
+      </div>
+    </div>
+
+    <!-- Top deudores -->
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">📊 Clientes que más deben</div>
+      <div id="lista-top">
+        <div class="vacio"><div class="vacio-icono">👥</div><p>Sin deudas activas</p></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  verificarAuth();
+  pintarNavbar();
+
+  async function cargarDashboard() {
+    // Resumen general
+    const { ok, data } = await apiCall('/api/dashboard/resumen');
+    if (ok) {
+      const r = data.resumen;
+      document.getElementById('m-clientes').textContent  = r.clientes_activos;
+      document.getElementById('m-pendiente').textContent = formatCOP(r.deudas.monto_pendiente);
+      document.getElementById('m-vencido').textContent   = formatCOP(r.deudas.monto_vencido);
+      document.getElementById('m-cobrado').textContent   = formatCOP(r.deudas.monto_cobrado);
+      document.getElementById('m-proximas').textContent  = r.proximas_a_vencer.total_deudas;
+    }
+
+    // Alertas
+    const { data: da } = await apiCall('/api/dashboard/alertas');
+    if (da.exito) {
+      const vencidas = da.alertas.vencidas.deudas;
+      const proximas = da.alertas.proximas_a_vencer.deudas;
+      const todas    = [...vencidas, ...proximas];
+      const cont     = document.getElementById('lista-alertas');
+      if (todas.length === 0) {
+        cont.innerHTML = '<div class="vacio"><div class="vacio-icono">✅</div><p>Sin alertas por ahora</p></div>';
+      } else {
+        cont.innerHTML = todas.map(d => `
+          <div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+            <div style="font-weight:600;font-size:14px">${d.cliente_nombre}</div>
+            <div style="font-size:12px;color:var(--subtexto)">${formatCOP(d.total)} · Vence: ${d.fecha_limite}</div>
+            <span class="badge badge-${d.estado}">${d.estado}</span>
+          </div>`).join('');
+      }
+    }
+
+    // Top deudores
+    const { data: dt } = await apiCall('/api/dashboard/top-deudores');
+    if (dt.exito) {
+      const cont = document.getElementById('lista-top');
+      if (dt.top_deudores.length === 0) {
+        cont.innerHTML = '<div class="vacio"><div class="vacio-icono">👥</div><p>Sin deudas activas</p></div>';
+      } else {
+        cont.innerHTML = dt.top_deudores.map((c, i) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0">
+            <div>
+              <span style="font-weight:700;color:var(--verde)">#${i+1}</span>
+              <span style="font-weight:600;margin-left:8px">${c.nombre}</span>
+              <div style="font-size:12px;color:var(--subtexto)">${c.total_deudas} deuda(s)</div>
+            </div>
+            <div style="font-weight:700;color:var(--rojo)">${formatCOP(c.deuda_total)}</div>
+          </div>`).join('');
+      }
+    }
+  }
+
+  cargarDashboard();
+</script>
+</body>
+</html>

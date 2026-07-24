@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<!--
+  deudas.html - Gestión de deudas
+  Proyecto: Cuenta Clara | Evidencia: GA7-220501096-AA5-EV03
+  Autor: Carlos Varón
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuenta Clara – Deudas</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">💰 Cuenta <span>Clara</span></div>
+  <div class="navbar-links">
+    <a href="dashboard.html" class="nav-link">🏠 Inicio</a>
+    <a href="clientes.html"  class="nav-link">👥 Clientes</a>
+    <a href="deudas.html"    class="nav-link active">📋 Deudas</a>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="nav-user" id="nav-tienda"></span>
+    <button class="btn btn-sm" onclick="cerrarSesion()"
+      style="background:rgba(255,255,255,0.15);color:#fff">Salir</button>
+  </div>
+</nav>
+
+<div class="contenedor">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <h2 class="page-title" style="margin:0">📋 Deudas</h2>
+    <button class="btn btn-primario" onclick="abrirModalDeuda()">+ Nueva deuda</button>
+  </div>
+
+  <div id="alerta" class="alerta-ui"></div>
+
+  <!-- Filtros -->
+  <div class="tarjeta" style="padding:16px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primario  btn-sm" onclick="cargarDeudas('')">Todas</button>
+      <button class="btn btn-secundario btn-sm" onclick="cargarDeudas('pendiente')">Pendientes</button>
+      <button class="btn btn-sm" style="background:var(--rojo-bg);color:var(--rojo)"
+        onclick="cargarDeudas('vencida')">Vencidas</button>
+      <button class="btn btn-sm" style="background:var(--verde-bg);color:var(--verde)"
+        onclick="cargarDeudas('pagada')">Pagadas</button>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="tarjeta">
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th>Fecha límite</th>
+            <th>Observaciones</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-deudas">
+          <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--subtexto)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nueva Deuda -->
+<div class="modal-overlay" id="modal-deuda">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-titulo">Nueva deuda</span>
+      <button class="modal-cerrar" onclick="cerrarModalDeuda()">✕</button>
+    </div>
+    <div id="alerta-modal" class="alerta-ui"></div>
+
+    <div class="grupo">
+      <label>Cliente *</label>
+      <select id="deuda-cliente">
+        <option value="">Selecciona un cliente...</option>
+      </select>
+    </div>
+    <div class="grupo">
+      <label>Fecha límite de pago</label>
+      <input type="date" id="deuda-fecha">
+    </div>
+    <div class="grupo">
+      <label>Observaciones</label>
+      <textarea id="deuda-obs" placeholder="Ej: Paga los viernes"></textarea>
+    </div>
+
+    <!-- Productos -->
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong style="font-size:14px">Productos fiados</strong>
+        <button class="btn btn-sm btn-secundario" onclick="agregarFilaProducto()">+ Producto</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 100px 60px 32px;gap:6px;margin-bottom:6px">
+        <small style="color:var(--subtexto)">Producto</small>
+        <small style="color:var(--subtexto)">Precio</small>
+        <small style="color:var(--subtexto)">Cant.</small>
+        <span></span>
+      </div>
+      <div id="lista-productos"></div>
+      <div class="total-deuda" id="total-display">Total: $0</div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secundario" style="flex:1" onclick="cerrarModalDeuda()">Cancelar</button>
+      <button class="btn btn-primario"   style="flex:1" onclick="guardarDeuda()">Registrar deuda</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  verificarAuth();
+  pintarNavbar();
+
+  async function cargarDeudas(estado = '') {
+    const url = estado ? `/api/deudas/?estado=${estado}` : '/api/deudas/';
+    const { ok, data } = await apiCall(url);
+    const tbody = document.getElementById('tabla-deudas');
+    if (!ok) { tbody.innerHTML = `<tr><td colspan="6">Error al cargar.</td></tr>`; return; }
+    if (data.deudas.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--subtexto)">
+        No hay deudas en esta categoría.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.deudas.map(d => `
+      <tr>
+        <td><strong>${d.cliente_nombre}</strong><br>
+            <small style="color:var(--subtexto)">${d.cliente_telefono||''}</small></td>
+        <td style="font-weight:700">${formatCOP(d.total)}</td>
+        <td><span class="badge badge-${d.estado}">${d.estado}</span></td>
+        <td>${d.fecha_limite || '–'}</td>
+        <td style="font-size:12px;color:var(--subtexto)">${d.observaciones || '–'}</td>
+        <td>
+          ${d.estado !== 'pagada' ? `
+            <button class="btn btn-sm btn-alerta" onclick="pagarDeuda(${d.id})">💵 Pagar</button>
+            <button class="btn btn-sm btn-peligro" onclick="eliminarDeuda(${d.id})">🗑</button>
+          ` : '<span style="color:var(--verde);font-size:12px">✅ Pagada</span>'}
+        </td>
+      </tr>`).join('');
+  }
+
+  async function pagarDeuda(id) {
+    if (!confirm('¿Marcar esta deuda como pagada?')) return;
+    const { ok, data } = await apiCall(`/api/deudas/${id}/pagar`, 'PATCH');
+    mostrarAlerta('alerta', ok ? 'exito' : 'error', data.mensaje);
+    if (ok) cargarDeudas();
+  }
+
+  async function eliminarDeuda(id) {
+    if (!confirm('¿Eliminar esta deuda?')) return;
+    const { ok, data } = await apiCall(`/api/deudas/${id}`, 'DELETE');
+    mostrarAlerta('alerta', ok ? 'exito' : 'error', data.mensaje);
+    if (ok) cargarDeudas();
+  }
+
+  // ── Modal nueva deuda ──────────────────────────────────────────────────
+  async function abrirModalDeuda() {
+    // Cargar clientes en el select
+    const { ok, data } = await apiCall('/api/clientes/');
+    const select = document.getElementById('deuda-cliente');
+    select.innerHTML = '<option value="">Selecciona un cliente...</option>';
+    if (ok) data.clientes.forEach(c => {
+      select.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
+    });
+    document.getElementById('lista-productos').innerHTML = '';
+    document.getElementById('deuda-fecha').value = '';
+    document.getElementById('deuda-obs').value   = '';
+    document.getElementById('total-display').textContent = 'Total: $0';
+    agregarFilaProducto();
+    document.getElementById('modal-deuda').classList.add('show');
+  }
+
+  function cerrarModalDeuda() {
+    document.getElementById('modal-deuda').classList.remove('show');
+  }
+
+  function agregarFilaProducto() {
+    const cont = document.getElementById('lista-productos');
+    const div  = document.createElement('div');
+    div.className = 'producto-item';
+    div.innerHTML = `
+      <input type="text"   placeholder="Nombre del producto" oninput="calcularTotal()">
+      <input type="number" placeholder="Precio" min="0" oninput="calcularTotal()">
+      <input type="number" placeholder="1"      min="1" value="1" oninput="calcularTotal()">
+      <button onclick="this.parentElement.remove();calcularTotal()"
+        style="background:var(--rojo-bg);color:var(--rojo);border:none;border-radius:6px;cursor:pointer;padding:6px 8px">✕</button>`;
+    cont.appendChild(div);
+  }
+
+  function calcularTotal() {
+    let total = 0;
+    document.querySelectorAll('#lista-productos .producto-item').forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      const precio   = parseFloat(inputs[1].value) || 0;
+      const cantidad = parseInt(inputs[2].value)   || 1;
+      total += precio * cantidad;
+    });
+    document.getElementById('total-display').textContent = `Total: ${formatCOP(total)}`;
+  }
+
+  async function guardarDeuda() {
+    const clienteId = document.getElementById('deuda-cliente').value;
+    if (!clienteId) return mostrarAlerta('alerta-modal', 'error', 'Selecciona un cliente.');
+
+    const productos = [];
+    let valido = true;
+    document.querySelectorAll('#lista-productos .producto-item').forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      const nombre   = inputs[0].value.trim();
+      const precio   = parseFloat(inputs[1].value);
+      const cantidad = parseInt(inputs[2].value) || 1;
+      if (!nombre || !precio) { valido = false; return; }
+      productos.push({ nombre_producto: nombre, precio, cantidad });
+    });
+
+    if (!valido || productos.length === 0)
+      return mostrarAlerta('alerta-modal', 'error', 'Completa todos los productos correctamente.');
+
+    const body = {
+      cliente_id   : parseInt(clienteId),
+      productos,
+      fecha_limite : document.getElementById('deuda-fecha').value || undefined,
+      observaciones: document.getElementById('deuda-obs').value.trim() || undefined
+    };
+
+    const { ok, data } = await apiCall('/api/deudas/', 'POST', body);
+    if (ok) {
+      cerrarModalDeuda();
+      mostrarAlerta('alerta', 'exito', data.mensaje);
+      cargarDeudas();
+    } else {
+      mostrarAlerta('alerta-modal', 'error', data.mensaje);
+    }
+  }
+
+  cargarDeudas();
+</script>
+</body>
+</html>
