@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<!--
+  index.html - Login y Registro del tendero
+  Proyecto: Cuenta Clara | Evidencia: GA7-220501096-AA5-EV03
+  Autor: Carlos Varón
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuenta Clara – Ingresa</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-box">
+
+    <!-- Logo -->
+    <div class="auth-logo">
+      <h1>💰 Cuenta Clara</h1>
+      <p>Gestión de deudas para tu tienda</p>
+    </div>
+
+    <!-- Tabs Login / Registro -->
+    <div class="auth-tabs">
+      <div class="auth-tab activa" id="tab-login"    onclick="cambiarTab('login')">Ingresar</div>
+      <div class="auth-tab"        id="tab-registro" onclick="cambiarTab('registro')">Registrarse</div>
+    </div>
+
+    <div id="alerta" class="alerta-ui"></div>
+
+    <!-- ── FORMULARIO LOGIN ── -->
+    <div id="form-login">
+      <div class="grupo">
+        <label>Correo electrónico</label>
+        <input type="email" id="login-email" placeholder="tucorreo@tienda.com">
+      </div>
+      <div class="grupo">
+        <label>Contraseña</label>
+        <input type="password" id="login-clave" placeholder="Tu contraseña">
+      </div>
+      <button class="btn btn-primario btn-bloque" onclick="login()">Ingresar a mi tienda</button>
+    </div>
+
+    <!-- ── FORMULARIO REGISTRO ── -->
+    <div id="form-registro" style="display:none">
+      <div class="grupo">
+        <label>Tu nombre completo</label>
+        <input type="text" id="reg-nombre" placeholder="Carlos Varón">
+      </div>
+      <div class="grupo">
+        <label>Nombre de tu tienda</label>
+        <input type="text" id="reg-tienda" placeholder="Tienda Don Carlos">
+      </div>
+      <div class="grupo">
+        <label>Correo electrónico</label>
+        <input type="email" id="reg-email" placeholder="tucorreo@tienda.com">
+      </div>
+      <div class="grupo">
+        <label>Teléfono (opcional)</label>
+        <input type="tel" id="reg-telefono" placeholder="3001234567">
+      </div>
+      <div class="grupo">
+        <label>Contraseña (mínimo 6 caracteres)</label>
+        <input type="password" id="reg-clave" placeholder="Crea tu contraseña">
+      </div>
+      <button class="btn btn-primario btn-bloque" onclick="registro()">Crear mi cuenta</button>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  // Si ya hay sesión, ir directo al dashboard
+  if (getToken()) window.location.href = 'dashboard.html';
+
+  function cambiarTab(tab) {
+    document.getElementById('form-login').style.display    = tab === 'login'    ? 'block' : 'none';
+    document.getElementById('form-registro').style.display = tab === 'registro' ? 'block' : 'none';
+    document.getElementById('tab-login').className    = 'auth-tab' + (tab === 'login'    ? ' activa' : '');
+    document.getElementById('tab-registro').className = 'auth-tab' + (tab === 'registro' ? ' activa' : '');
+  }
+
+  async function login() {
+    const email = document.getElementById('login-email').value.trim();
+    const clave = document.getElementById('login-clave').value.trim();
+    if (!email || !clave) return mostrarAlerta('alerta', 'error', 'Completa todos los campos.');
+
+    const { ok, data } = await apiCallPublic('/api/auth/login', 'POST', { email, contrasena: clave });
+    if (ok) {
+      localStorage.setItem('cc_token',   data.token);
+      localStorage.setItem('cc_tendero', JSON.stringify(data.tendero));
+      window.location.href = 'dashboard.html';
+    } else {
+      mostrarAlerta('alerta', 'error', data.mensaje);
+    }
+  }
+
+  async function registro() {
+    const nombre   = document.getElementById('reg-nombre').value.trim();
+    const tienda   = document.getElementById('reg-tienda').value.trim();
+    const email    = document.getElementById('reg-email').value.trim();
+    const telefono = document.getElementById('reg-telefono').value.trim();
+    const clave    = document.getElementById('reg-clave').value.trim();
+    if (!nombre || !tienda || !email || !clave)
+      return mostrarAlerta('alerta', 'error', 'Completa los campos obligatorios.');
+
+    const { ok, data } = await apiCallPublic('/api/auth/registro', 'POST',
+      { nombre, nombre_tienda: tienda, email, telefono, contrasena: clave });
+    if (ok) {
+      localStorage.setItem('cc_token',   data.token);
+      localStorage.setItem('cc_tendero', JSON.stringify(data.tendero));
+      window.location.href = 'dashboard.html';
+    } else {
+      mostrarAlerta('alerta', 'error', data.mensaje);
+    }
+  }
+
+  // Llamada pública sin token
+  async function apiCallPublic(endpoint, method, body) {
+    const res  = await fetch(`${API_URL}${endpoint}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    return { ok: res.ok, data };
+  }
+
+  // Enter para enviar
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (document.getElementById('form-login').style.display !== 'none') login();
+      else registro();
+    }
+  });
+</script>
+</body>
+</html>

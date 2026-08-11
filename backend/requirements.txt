@@ -1,0 +1,16 @@
+# =============================================================================
+# requirements.txt - Dependencias del proyecto Cuenta Clara
+# Instalación: pip install -r requirements.txt
+# =============================================================================
+
+# Framework web
+Flask==3.0.3
+
+# Conector MySQL
+mysql-connector-python==8.4.0
+
+# JWT para autenticación
+PyJWT==2.8.0
+
+# CORS: permite que el frontend (HTML) consuma la API
+flask-cors==4.0.1

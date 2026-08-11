@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<!--
+  clientes.html - Gestión de clientes
+  Proyecto: Cuenta Clara | Evidencia: GA7-220501096-AA5-EV03
+  Autor: Carlos Varón
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuenta Clara – Clientes</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">💰 Cuenta <span>Clara</span></div>
+  <div class="navbar-links">
+    <a href="dashboard.html" class="nav-link">🏠 Inicio</a>
+    <a href="clientes.html"  class="nav-link active">👥 Clientes</a>
+    <a href="deudas.html"    class="nav-link">📋 Deudas</a>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="nav-user" id="nav-tienda"></span>
+    <button class="btn btn-sm" onclick="cerrarSesion()"
+      style="background:rgba(255,255,255,0.15);color:#fff">Salir</button>
+  </div>
+</nav>
+
+<div class="contenedor">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <h2 class="page-title" style="margin:0">👥 Mis Clientes</h2>
+    <button class="btn btn-primario" onclick="abrirModalNuevo()">+ Nuevo cliente</button>
+  </div>
+
+  <div id="alerta" class="alerta-ui"></div>
+
+  <!-- Buscador -->
+  <div class="tarjeta" style="padding:16px">
+    <input type="text" id="buscador" placeholder="🔍 Buscar cliente por nombre..."
+      oninput="buscarCliente()" style="margin:0">
+  </div>
+
+  <!-- Tabla -->
+  <div class="tarjeta">
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Teléfono</th>
+            <th>Deuda pendiente</th>
+            <th>Deuda vencida</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-clientes">
+          <tr><td colspan="5" style="text-align:center;color:var(--subtexto);padding:30px">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nuevo/Editar cliente -->
+<div class="modal-overlay" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-titulo" id="modal-titulo">Nuevo cliente</span>
+      <button class="modal-cerrar" onclick="cerrarModal()">✕</button>
+    </div>
+    <div id="alerta-modal" class="alerta-ui"></div>
+    <input type="hidden" id="cliente-id">
+    <div class="grupo">
+      <label>Nombre completo *</label>
+      <input type="text" id="cliente-nombre" placeholder="María López">
+    </div>
+    <div class="grupo">
+      <label>Teléfono</label>
+      <input type="tel" id="cliente-telefono" placeholder="3109876543">
+    </div>
+    <div class="grupo">
+      <label>Dirección</label>
+      <input type="text" id="cliente-direccion" placeholder="Calle 5 # 10-20">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-secundario" style="flex:1" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primario"   style="flex:1" onclick="guardarCliente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  verificarAuth();
+  pintarNavbar();
+  let timeoutBuscar;
+
+  async function cargarClientes(buscar = '') {
+    const url = buscar ? `/api/clientes/?buscar=${encodeURIComponent(buscar)}` : '/api/clientes/';
+    const { ok, data } = await apiCall(url);
+    const tbody = document.getElementById('tabla-clientes');
+    if (!ok) { tbody.innerHTML = `<tr><td colspan="5">Error al cargar.</td></tr>`; return; }
+    if (data.clientes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--subtexto)">
+        No hay clientes aún. ¡Agrega el primero!</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.clientes.map(c => `
+      <tr>
+        <td><strong>${c.nombre}</strong></td>
+        <td>${c.telefono || '–'}</td>
+        <td style="color:var(--verde);font-weight:600">${formatCOP(c.deuda_pendiente)}</td>
+        <td style="color:var(--rojo);font-weight:600">${formatCOP(c.deuda_vencida)}</td>
+        <td>
+          <button class="btn btn-sm btn-secundario" onclick="editarCliente(${c.id},'${c.nombre}','${c.telefono||''}','${c.direccion||''}')">Editar</button>
+          <button class="btn btn-sm btn-peligro"    onclick="eliminarCliente(${c.id},'${c.nombre}')">Eliminar</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function buscarCliente() {
+    clearTimeout(timeoutBuscar);
+    timeoutBuscar = setTimeout(() => cargarClientes(document.getElementById('buscador').value), 350);
+  }
+
+  function abrirModalNuevo() {
+    document.getElementById('modal-titulo').textContent = 'Nuevo cliente';
+    document.getElementById('cliente-id').value        = '';
+    document.getElementById('cliente-nombre').value    = '';
+    document.getElementById('cliente-telefono').value  = '';
+    document.getElementById('cliente-direccion').value = '';
+    document.getElementById('modal-cliente').classList.add('show');
+  }
+
+  function editarCliente(id, nombre, telefono, direccion) {
+    document.getElementById('modal-titulo').textContent    = 'Editar cliente';
+    document.getElementById('cliente-id').value            = id;
+    document.getElementById('cliente-nombre').value        = nombre;
+    document.getElementById('cliente-telefono').value      = telefono;
+    document.getElementById('cliente-direccion').value     = direccion;
+    document.getElementById('modal-cliente').classList.add('show');
+  }
+
+  function cerrarModal() {
+    document.getElementById('modal-cliente').classList.remove('show');
+  }
+
+  async function guardarCliente() {
+    const id       = document.getElementById('cliente-id').value;
+    const nombre   = document.getElementById('cliente-nombre').value.trim();
+    const telefono = document.getElementById('cliente-telefono').value.trim();
+    const direccion= document.getElementById('cliente-direccion').value.trim();
+    if (!nombre) return mostrarAlerta('alerta-modal', 'error', 'El nombre es obligatorio.');
+
+    const esEdicion = !!id;
+    const url    = esEdicion ? `/api/clientes/${id}` : '/api/clientes/';
+    const method = esEdicion ? 'PUT' : 'POST';
+    const { ok, data } = await apiCall(url, method, { nombre, telefono, direccion });
+
+    if (ok) {
+      cerrarModal();
+      mostrarAlerta('alerta', 'exito', data.mensaje);
+      cargarClientes();
+    } else {
+      mostrarAlerta('alerta-modal', 'error', data.mensaje);
+    }
+  }
+
+  async function eliminarCliente(id, nombre) {
+    if (!confirm(`¿Eliminar a "${nombre}"? Solo se puede si no tiene deudas pendientes.`)) return;
+    const { ok, data } = await apiCall(`/api/clientes/${id}`, 'DELETE');
+    mostrarAlerta('alerta', ok ? 'exito' : 'error', data.mensaje);
+    if (ok) cargarClientes();
+  }
+
+  cargarClientes();
+</script>
+</body>
+</html>
